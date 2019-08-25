@@ -43,7 +43,7 @@ def pre_process_msg(message):
     words = [slang_dict[word.lower()].lower() if word.lower() in slang_dict else word.lower() for word in message.split()]
     # translate numbers to phonenumber and othernumber
     words = [handle_nembers(word) if has_number(word) and handle_nembers(word) is not None else word for word in words]
-
+    
     message = " ".join(words)
     return message
 
