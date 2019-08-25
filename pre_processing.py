@@ -4,7 +4,7 @@ from nltk.corpus import words
 import pandas as pd
 import string
 from nltk.wsd import lesk
-import enchant
+# import enchant
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
@@ -65,8 +65,8 @@ def clean_text(message):
             words.append(word)
             continue
         else:
-            if not english_dict.check(word):
-                print(word)
+            if word not in nltk_words:
+                # print(word)
                 continue
             # remove stop words
             if word in nltk_stop_words or word in signs_list:
@@ -77,6 +77,9 @@ def clean_text(message):
 
         words.append(stemmer.stem(word))
 
+    if len(words) == 0:
+        print('----------\nlen is 0')
+        print(message)
     # join words to one string
     return " ".join(words)
 
@@ -168,8 +171,8 @@ if __name__ == "__main__":
     signs_list = [',', '/', '.', '"', "'", '?', '\\', ':', '(', ')', '*', '-', '=', '+', '&', '^', '$', '%', '#', '@',
                   '!', '`', '~', "'s"]
     stemmer = nltk.SnowballStemmer("english")
-    # nltk_words = nltk.corpus.words.words()
-    english_dict = enchant.Dict("en_US")
+    nltk_words = nltk.corpus.words.words()
+    # english_dict = enchant.Dict("en_US")
     slang_dict = create_noslang_dict()
 
     # Actual code
