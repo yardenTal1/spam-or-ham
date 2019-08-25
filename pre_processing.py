@@ -4,7 +4,7 @@ from nltk.corpus import words
 import pandas as pd
 import string
 from nltk.wsd import lesk
-# import enchant
+import enchant
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
@@ -65,7 +65,7 @@ def clean_text(message):
             words.append(word)
             continue
         else:
-            if word not in nltk_words:
+            if not english_dict.check(word):
                 # print(word)
                 continue
             # remove stop words
@@ -120,8 +120,8 @@ def prepare_data_for_classify(data):
 
 
 def bag_of_words(x_train, x_test):
-    cv = CountVectorizer(strip_accents='ascii', token_pattern = u'(?ui)\\b\\w * [a - z] +\\w *\\b', lowercase = True,
-                         stop_words ='english')
+    # cv = CountVectorizer(strip_accents='ascii', token_pattern = u'(?ui)\\b\\w * [a - z] +\\w *\\b', lowercase = True, stop_words ='english')
+    cv = CountVectorizer()
     x_train_cv = cv.fit_transform(x_train)
     x_test_cv = cv.transform(x_test)
     return x_train_cv, x_test_cv, cv
@@ -163,6 +163,7 @@ def investigate_misses(x_test, y_test, predictions):
     check_df = pd.DataFrame({'actual_label': list(y_test), 'prediction': testing_predictions, 'text':list(x_test)})
     check_df.replace(to_replace=0, value='ham', inplace = True)
     check_df.replace(to_replace=1, value='spam', inplace = True)
+    print('finish misses')
 
 
 if __name__ == "__main__":
@@ -171,8 +172,8 @@ if __name__ == "__main__":
     signs_list = [',', '/', '.', '"', "'", '?', '\\', ':', '(', ')', '*', '-', '=', '+', '&', '^', '$', '%', '#', '@',
                   '!', '`', '~', "'s"]
     stemmer = nltk.SnowballStemmer("english")
-    nltk_words = nltk.corpus.words.words()
-    # english_dict = enchant.Dict("en_US")
+    # nltk_words = nltk.corpus.words.words()
+    english_dict = enchant.Dict("en_US")
     slang_dict = create_noslang_dict()
 
     # Actual code
