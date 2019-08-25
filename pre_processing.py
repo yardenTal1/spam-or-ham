@@ -44,7 +44,7 @@ def is_number(in_string):
 
 def pre_process_msg(message):
     # remove punctuation # TODO check if use ' ' instead of ''
-    message = message.translate(str.maketrans('', '', string.punctuation))
+    message = message.translate(str.maketrans(string.punctuation, ' '*len(string.punctuation)))
     # translate slang, and lower words
     words = [slang_dict[word.lower()].lower() if word.lower() in slang_dict else word.lower() for word in message.split()]
     # translate numbers to phonenumber and othernumber
@@ -80,6 +80,7 @@ def clean_text(message):
     if len(words) == 0:
         print('----------\nlen is 0')
         print(message)
+        return message
     # join words to one string
     return " ".join(words)
 
@@ -87,7 +88,7 @@ def clean_text(message):
 def find_sense(word, sentense):
     new_word = lesk(sentense, word, 'n')
     if new_word is not None:
-        #
+        return new_word._name.split('.')[0] # TODO remove later! hyper does not work well
         new_word = new_word.hypernyms()
         if new_word is not None and len(new_word) > 0:
             word = new_word[0]._name.split('.')[0]  # TODO
@@ -147,7 +148,7 @@ def print_results(y_test, predictions):
 
 def investigate_score(y_test, predictions):
     cm = confusion_matrix(y_test, predictions)
-    sns.heatmap(cm, square=True, annot=True, cmap='RdBu', cbar = False, xticklabels = ['ham', 'spam'], yticklabels = ['ham', 'spam'])
+    sns.heatmap(cm, square=True, annot=True, cmap='RdBu', cbar = False, xticklabels = ['ham', 'spam'], yticklabels = ['ham', 'spam'], fmt='g')
     plt.xlabel('true label')
     plt.ylabel('predicted label')
     plt.show()
