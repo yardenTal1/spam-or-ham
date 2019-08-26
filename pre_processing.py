@@ -1,10 +1,9 @@
 import nltk
 from nltk.stem import PorterStemmer
-from nltk.corpus import words
 import pandas as pd
 import string
 from nltk.wsd import lesk
-# import enchant
+import enchant
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
@@ -16,6 +15,9 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 from sklearn.cluster import KMeans
 from gensim.models import Word2Vec
 from nltk.cluster import KMeansClusterer
+from nltk.tokenize import RegexpTokenizer
+from nltk.corpus.util import LazyCorpusLoader
+from nltk.corpus.reader import *
 
 
 PHONE_NUMBER = 'phonenumber'
@@ -70,17 +72,28 @@ def clean_text(message):
             words.append(word)
             continue
         else:
-            # if not english_dict.check(word):
-            #     # print(word)
-            #     # continue # TODO return that
-            #     suggested_words = english_dict.suggest(word)
-            #     if len(suggested_words) > 0:
-            #         # TODO check context
-            #         word = suggested_words[0]
-            #     else:
-            #         # TODO if there is no suggestion- remove the word
-            #         # continue
-            #         pass
+            if not english_dict.check(word):
+                suggested_words = english_dict.suggest(word)
+                if len(suggested_words) > 0 and suggested_words[0].lower() != word:
+                    # TODO check context
+                    all_optional_sinsets = []
+                    for optional_word in suggested_words:
+                        optional_word = optional_word.lower()
+                        all_optional_sinsets += wordnet.synsets(optional_word)
+                    all_optional_sinsets = set(all_optional_sinsets)
+                    new_word = lesk(sentense, word, synsets=all_optional_sinsets)
+                    if new_word is not None:
+                        word = new_word._name.split('.')[0]
+                    else:
+                        # print('-----whoops-----')
+                        # print(word)
+                        # print(suggested_words[0])
+                        word = suggested_words[0].lower()
+                else:
+                    # if len(suggested_words) == 0:
+                    #     # TODO if there is no suggestion- remove the word
+                    #     continue
+                    pass
             # remove stop words
             if word in nltk_stop_words or word in signs_list:
                 continue
@@ -91,8 +104,8 @@ def clean_text(message):
         words.append(stemmer.stem(word))
 
     if len(words) == 0:
-        print('----------\nlen is 0')
-        print(message)
+        # print('----------\nlen is 0')
+        # print(message)
         return message
     # join words to one string
     return " ".join(words)
@@ -194,7 +207,6 @@ def wordEmbbiding(data_text, load=False):
         # Create CBOW model
         model = Word2Vec(data, min_count=1,size=100, window=5)
         model.save("word2vec.model")
-    print('check')
     return model
 
 
@@ -218,18 +230,27 @@ if __name__ == "__main__":
     signs_list = [',', '/', '.', '"', "'", '?', '\\', ':', '(', ')', '*', '-', '=', '+', '&', '^', '$', '%', '#', '@',
                   '!', '`', '~', "'s"]
     stemmer = nltk.SnowballStemmer("english")
-    # nltk_words = nltk.corpus.words.words()
-    # english_dict = enchant.Dict("en_US")
+    english_dict = enchant.Dict("en_US")
     slang_dict = create_noslang_dict()
+    wordnet = LazyCorpusLoader(
+        'wordnet',
+        WordNetCorpusReader,
+        LazyCorpusLoader('omw', CorpusReader, r'.*/wn-data-.*\.tab', encoding='utf8'),
+    )
+
 
     # Actual code
+    print('----------read data----------')
     data = read_data()
+    print('----------pre procsss data----------')
     data = pre_process_data(data)
-    word2vec_model = wordEmbbiding(data['text'], load=False)
+    load=False
+    print('----------build word2vec model load=%s----------' % str(load))
+    word2vec_model = wordEmbbiding(data['text'], load=load)
+    print('----------assign clusters----------')
     assigned_clusters = clustering_with_k_means(word2vec_model)
+    print('----------print clusters----------')
     print_clustering(word2vec_model, assigned_clusters)
-
-
 
     x_train, x_test, y_train, y_test = prepare_data_for_classify(data)
     x_train_cv, x_test_cv, cv = bag_of_words(x_train, x_test)
