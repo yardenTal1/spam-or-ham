@@ -12,6 +12,10 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 import seaborn as sns
+from nltk.tokenize import sent_tokenize, word_tokenize
+from sklearn.cluster import KMeans
+from gensim.models import Word2Vec
+
 
 PHONE_NUMBER = 'phonenumber'
 OTHER_NUMBER = 'othernumber'
@@ -65,9 +69,17 @@ def clean_text(message):
             words.append(word)
             continue
         else:
-            if not english_dict.check(word):
-                # print(word)
-                continue
+            # if not english_dict.check(word):
+            #     # print(word)
+            #     # continue # TODO return that
+            #     suggested_words = english_dict.suggest(word)
+            #     if len(suggested_words) > 0:
+            #         # TODO check context
+            #         word = suggested_words[0]
+            #     else:
+            #         # TODO if there is no suggestion- remove the word
+            #         # continue
+            #         pass
             # remove stop words
             if word in nltk_stop_words or word in signs_list:
                 continue
@@ -167,6 +179,24 @@ def investigate_misses(x_test, y_test, predictions):
     print('finish misses')
 
 
+def wordEmbbiding(data_text, load=False):
+    if load:
+        model1 = Word2Vec.load("word2vec.model")
+    else:
+        data_text = " ".join(data_text)
+        data = []
+
+        # tokenize the into words
+        for word in nltk.word_tokenize(data_text):
+            data.append(word)
+
+        # Create CBOW model
+        model1 = Word2Vec(data, min_count=1,size=100, window=5)
+        model1.save("word2vec.model")
+    print('check')
+    return model1
+
+
 if __name__ == "__main__":
     # General variables
     nltk_stop_words = set(nltk.corpus.stopwords.words('english'))
@@ -180,6 +210,8 @@ if __name__ == "__main__":
     # Actual code
     data = read_data()
     data = pre_process_data(data)
+    word2vec_model = wordEmbbiding(data['text'], load=True)
+    
 
     x_train, x_test, y_train, y_test = prepare_data_for_classify(data)
     x_train_cv, x_test_cv, cv = bag_of_words(x_train, x_test)
