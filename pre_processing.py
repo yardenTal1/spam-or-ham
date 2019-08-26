@@ -4,7 +4,7 @@ from nltk.corpus import words
 import pandas as pd
 import string
 from nltk.wsd import lesk
-import enchant
+# import enchant
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
@@ -15,11 +15,12 @@ import seaborn as sns
 from nltk.tokenize import sent_tokenize, word_tokenize
 from sklearn.cluster import KMeans
 from gensim.models import Word2Vec
+from nltk.cluster import KMeansClusterer
 
 
 PHONE_NUMBER = 'phonenumber'
 OTHER_NUMBER = 'othernumber'
-
+NUM_CLUSTERS = 50
 
 def read_data():
     messages = pd.read_csv("./spam.csv", encoding='latin-1')
@@ -181,23 +182,34 @@ def investigate_misses(x_test, y_test, predictions):
 
 def wordEmbbiding(data_text, load=False):
     if load:
-        model1 = Word2Vec.load("word2vec.model")
+        model = Word2Vec.load("word2vec.model")
     else:
-        data_text = " ".join(data_text)
+        data_text = list(data_text)
         data = []
 
         # tokenize the into words
-        for word in nltk.word_tokenize(data_text):
-            data.append(word)
+        for sent in data_text:
+            data.append(nltk.word_tokenize(sent))
 
         # Create CBOW model
-        model1 = Word2Vec(data, min_count=1,size=100, window=5)
-        model1.save("word2vec.model")
+        model = Word2Vec(data, min_count=1,size=100, window=5)
+        model.save("word2vec.model")
     print('check')
-    return model1
+    return model
+
 
 def clustering_with_k_means(model):
-    X = model[model.vocab]
+    X = model[model.wv.vocab]
+    k_clusterer = KMeansClusterer(NUM_CLUSTERS, distance=nltk.cluster.util.cosine_distance, repeats=25)
+    assigned_clusters = k_clusterer.cluster(X, assign_clusters=True)
+    print(assigned_clusters)
+    return assigned_clusters
+
+
+def print_clustering(model, assigned_clusters):
+    words = list(model.wv.vocab)
+    for i, word in enumerate(words):
+        print(word + ":" + str(assigned_clusters[i]))
 
 
 if __name__ == "__main__":
@@ -207,13 +219,16 @@ if __name__ == "__main__":
                   '!', '`', '~', "'s"]
     stemmer = nltk.SnowballStemmer("english")
     # nltk_words = nltk.corpus.words.words()
-    english_dict = enchant.Dict("en_US")
+    # english_dict = enchant.Dict("en_US")
     slang_dict = create_noslang_dict()
 
     # Actual code
     data = read_data()
     data = pre_process_data(data)
-    word2vec_model = wordEmbbiding(data['text'], load=True)
+    word2vec_model = wordEmbbiding(data['text'], load=False)
+    assigned_clusters = clustering_with_k_means(word2vec_model)
+    print_clustering(word2vec_model, assigned_clusters)
+
 
 
     x_train, x_test, y_train, y_test = prepare_data_for_classify(data)
