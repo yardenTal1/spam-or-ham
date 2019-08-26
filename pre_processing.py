@@ -196,6 +196,9 @@ def wordEmbbiding(data_text, load=False):
     print('check')
     return model1
 
+def clustering_with_k_means(model):
+    X = model[model.vocab]
+
 
 if __name__ == "__main__":
     # General variables
@@ -211,7 +214,7 @@ if __name__ == "__main__":
     data = read_data()
     data = pre_process_data(data)
     word2vec_model = wordEmbbiding(data['text'], load=True)
-    
+
 
     x_train, x_test, y_train, y_test = prepare_data_for_classify(data)
     x_train_cv, x_test_cv, cv = bag_of_words(x_train, x_test)
