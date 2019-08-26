@@ -1,4 +1,5 @@
 import nltk
+import numpy as np
 from nltk.stem import PorterStemmer
 import pandas as pd
 import string
@@ -22,13 +23,15 @@ from nltk.corpus.reader import *
 
 PHONE_NUMBER = 'phonenumber'
 OTHER_NUMBER = 'othernumber'
-NUM_CLUSTERS = 50
+NUM_CLUSTERS = 200
+
 
 def read_data():
     messages = pd.read_csv("./spam.csv", encoding='latin-1')
     # Drop the extra columns and rename columns
     messages = messages.drop(labels=["Unnamed: 2", "Unnamed: 3", "Unnamed: 4"], axis=1)
     messages.columns = ["category", "text"]
+    # messages = messages.iloc[0:100] # TODO remove after testing
     return messages
 
 
@@ -50,7 +53,7 @@ def is_number(in_string):
 
 
 def pre_process_msg(message):
-    # remove punctuation # TODO check if use ' ' instead of ''
+    # remove punctuation
     message = message.translate(str.maketrans(string.punctuation, ' '*len(string.punctuation)))
     # translate slang, and lower words
     words = [slang_dict[word.lower()].lower() if word.lower() in slang_dict else word.lower() for word in message.split()]
@@ -62,8 +65,6 @@ def pre_process_msg(message):
 
 
 def clean_text(message):
-    #TODO remove words that are not in english? what about 'goooooood' for example?
-
     # remove punctuation
     words = []
     sentense = message.split()
@@ -75,7 +76,6 @@ def clean_text(message):
             if not english_dict.check(word):
                 suggested_words = english_dict.suggest(word)
                 if len(suggested_words) > 0 and suggested_words[0].lower() != word:
-                    # TODO check context
                     all_optional_sinsets = []
                     for optional_word in suggested_words:
                         optional_word = optional_word.lower()
@@ -112,12 +112,13 @@ def clean_text(message):
 
 
 def find_sense(word, sentense):
-    new_word = lesk(sentense, word, 'n')
+    new_word = lesk(sentense, word, pos='n')
     if new_word is not None:
-        return new_word._name.split('.')[0] # TODO remove later! hyper does not work well
-        new_word = new_word.hypernyms()
-        if new_word is not None and len(new_word) > 0:
-            word = new_word[0]._name.split('.')[0]  # TODO
+        # return new_word._name.split('.')[0] # TODO remove later! hyper does not work well
+        all_hypernyms = new_word.hypernyms()
+        if all_hypernyms is not None and len(all_hypernyms) > 0:
+            new_word = lesk(sentense, word, synsets=all_hypernyms, pos='n')
+            word = new_word._name.split('.')[0]  # TODO
     return word
 
 
@@ -134,7 +135,6 @@ def handle_nembers(number):
 def pre_process_data(data):
     data['text'] = data['text'].apply(pre_process_msg)
     data['text'] = data['text'].apply(clean_text)
-
     return data
 
 
@@ -142,7 +142,7 @@ def prepare_data_for_classify(data):
     # assigned label 1 if spam and 0 if ham
     data['label'] = data['category'].apply(lambda x: 0 if x =='ham' else 1)
     # Split data into training and testing sets
-    x_train, x_test, y_train, y_test = train_test_split(data['text'], data['label'], random_state = 1)
+    x_train, x_test, y_train, y_test = train_test_split(data['text'], data['label'], random_state = 5)
     return x_train, x_test, y_train, y_test
 
 
@@ -202,7 +202,8 @@ def wordEmbbiding(data_text, load=False):
 
         # tokenize the into words
         for sent in data_text:
-            data.append(nltk.word_tokenize(sent))
+            for word in nltk.word_tokenize(sent):
+                data.append([word])
 
         # Create CBOW model
         model = Word2Vec(data, min_count=1,size=100, window=5)
@@ -214,19 +215,48 @@ def clustering_with_k_means(model):
     X = model[model.wv.vocab]
     k_clusterer = KMeansClusterer(NUM_CLUSTERS, distance=nltk.cluster.util.cosine_distance, repeats=25)
     assigned_clusters = k_clusterer.cluster(X, assign_clusters=True)
-    print(assigned_clusters)
-    return assigned_clusters
+    return assigned_clusters, k_clusterer
 
 
-def print_clustering(model, assigned_clusters):
+def print_clustering(model, assigned_clusters, k_clusterer):
     words = list(model.wv.vocab)
     for i, word in enumerate(words):
         print(word + ":" + str(assigned_clusters[i]))
 
 
+def print_means(k_clusterer):
+    print('Means:', k_clusterer.means())
+
+
+def change_msg_by_cluster(message, cluster_words, k_clusterer, model):
+    # translate slang, and lower words
+    words = message.split()
+    new_words = []
+    for word in words:
+        word_class = k_clusterer.classify(model.wv[word])
+        new_words.append(cluster_words[word_class])
+
+    message = " ".join(new_words)
+    return message
+
+
+def change_data_by_cluster(data_text, k_clusterer, model, assigned_clusters):
+    cluster_words = [-1]*30
+
+    words = list(model.wv.vocab)
+    for i, word in enumerate(words):
+        cur_class = assigned_clusters[i]
+        if cluster_words[cur_class] == -1:
+            cluster_words[cur_class] = word
+
+    apply_func = lambda x: change_msg_by_cluster(x, cluster_words, k_clusterer, model)
+    return data_text.apply(apply_func)
+
+
 if __name__ == "__main__":
     # General variables
     nltk_stop_words = set(nltk.corpus.stopwords.words('english'))
+    signs_str = """!"#$%&':()*+,-./:;<=>?@[\]^_`{|}~"""
     signs_list = [',', '/', '.', '"', "'", '?', '\\', ':', '(', ')', '*', '-', '=', '+', '&', '^', '$', '%', '#', '@',
                   '!', '`', '~', "'s"]
     stemmer = nltk.SnowballStemmer("english")
@@ -238,19 +268,17 @@ if __name__ == "__main__":
         LazyCorpusLoader('omw', CorpusReader, r'.*/wn-data-.*\.tab', encoding='utf8'),
     )
 
-
     # Actual code
     print('----------read data----------')
     data = read_data()
     print('----------pre procsss data----------')
     data = pre_process_data(data)
-    load=False
-    print('----------build word2vec model load=%s----------' % str(load))
-    word2vec_model = wordEmbbiding(data['text'], load=load)
-    print('----------assign clusters----------')
-    assigned_clusters = clustering_with_k_means(word2vec_model)
-    print('----------print clusters----------')
-    print_clustering(word2vec_model, assigned_clusters)
+    # load=False
+    # print('----------build word2vec model load=%s----------' % str(load))
+    # word2vec_model = wordEmbbiding(data['text'], load=load)
+    # print('----------assign clusters----------')
+    # assigned_clusters, k_clusterer = clustering_with_k_means(word2vec_model)
+    # data['text'] = change_data_by_cluster(data['text'], k_clusterer, word2vec_model, assigned_clusters)
 
     x_train, x_test, y_train, y_test = prepare_data_for_classify(data)
     x_train_cv, x_test_cv, cv = bag_of_words(x_train, x_test)
@@ -266,4 +294,4 @@ if __name__ == "__main__":
     investigate_score(y_test, predictions)
     investigate_misses(x_test, y_test, predictions)
 
-    pass # TODO do lesk just after we remove un english words
+    pass
