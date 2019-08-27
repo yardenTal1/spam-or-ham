@@ -101,7 +101,7 @@ def clean_text(message):
             # find a sense that describe the current word
             word = find_sense(word, sentense)
 
-        words.append(stemmer.stem(word))
+        words.append(stemmer.stem(word)) # TODO check if and where put the stemming
 
     if len(words) == 0:
         # print('----------\nlen is 0')
