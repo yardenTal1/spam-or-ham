@@ -43,6 +43,7 @@ def create_noslang_dict():
 
 def first_msg_translation(message):
     # remove punctuation
+    old_msg = message
     message = message.translate(str.maketrans(string.punctuation, ' '*len(string.punctuation)))
     # translate slang, and lower words
     words = [slang_dict[word.lower()].lower() if word.lower() in slang_dict else word.lower() for word in message.split()]
@@ -58,7 +59,7 @@ def second_msg_translation(message, feature_extraction):
     words = []
     sentense = message.split()
     for word in sentense:
-        if word in [PHONE_NUMBER, OTHER_NUMBER]:
+        if word in [PHONE_NUMBER, OTHER_NUMBER, 'free']:
             words.append(word)
             continue
         else:
@@ -79,8 +80,15 @@ def second_msg_translation(message, feature_extraction):
             if word in nltk_stop_words or word in signs_list:
                 continue
             # find a sense that describe the current word
+        words.append(word) # TODO check if and where put the stemming
+    new_words = []
+    for word in words:
+        if word in [PHONE_NUMBER, OTHER_NUMBER, 'free']:
+            new_words.append(word)
+        else:
             word = find_sense(word, sentense, feature_extraction)
-        words.append(stemmer.stem(word)) # TODO check if and where put the stemming
+            new_words.append(stemmer.stem(word))
+    words = new_words
     if len(words) == 0:
         # if the message contain only stop words, return as is
         return message
@@ -432,6 +440,12 @@ if __name__ == "__main__":
     signs_list = [',', '/', '.', '"', "'", '?', '\\', ':', '(', ')', '*', '-', '=', '+', '&', '^', '$', '%',
                   '#', '@', '!', '`', '~', "'s"]
 
+    msg = 'Had your mobile 11 months or more? U R entitled to Update to the latest colour mobiles with camera for Free! Call The Mobile Update Co FREE on 08002986030'
+    print(msg)
+    msg = first_msg_translation(msg)
+    print(msg)
+    msg = second_msg_translation(msg, True)
+    print(msg)
     # Actual code
     print('------------------read data-------------------')
     data = read_data()
