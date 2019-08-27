@@ -159,7 +159,7 @@ def investigate_data(x_cv, cv):
     top_words_df = pd.DataFrame(word_freq_df.sum()).sort_values(0, ascending=False)
 
 
-def multinomial_naive_bayes_classifier(x_train_cv, x_test_cv):
+def multinomial_naive_bayes_classifier(x_train_cv, y_train, x_test_cv):
     naive_bayes = MultinomialNB()
     naive_bayes.fit(x_train_cv, y_train)
     predictions = naive_bayes.predict(x_test_cv)
@@ -287,7 +287,7 @@ if __name__ == "__main__":
     investigate_data(x_train_cv, cv)
     investigate_data(x_test_cv, cv)
 
-    predictions = multinomial_naive_bayes_classifier(x_train_cv, x_test_cv)
+    predictions = multinomial_naive_bayes_classifier(x_train_cv, y_train, x_test_cv)
 
     # investigate results
     print_results(y_test, predictions)
