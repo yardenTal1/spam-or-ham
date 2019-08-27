@@ -1,6 +1,5 @@
 import nltk
-import numpy as np
-from nltk.stem import PorterStemmer
+
 import pandas as pd
 import string
 from nltk.wsd import lesk
@@ -23,7 +22,9 @@ from nltk.corpus.reader import *
 
 PHONE_NUMBER = 'phonenumber'
 OTHER_NUMBER = 'othernumber'
-NUM_CLUSTERS = 200
+NUM_CLUSTERS = 10
+pre_slang_punctuation = r""""'()+,-./:;<=>?[\]_`{|}"""
+all_punctuation = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
 
 
 def read_data():
@@ -52,7 +53,7 @@ def is_number(in_string):
     return all(char.isdigit() for char in in_string)
 
 
-def pre_process_msg(message):
+def first_msg_translation(message):
     # remove punctuation
     message = message.translate(str.maketrans(string.punctuation, ' '*len(string.punctuation)))
     # translate slang, and lower words
@@ -64,7 +65,7 @@ def pre_process_msg(message):
     return message
 
 
-def clean_text(message):
+def second_msg_translation(message):
     # remove punctuation
     words = []
     sentense = message.split()
@@ -83,29 +84,17 @@ def clean_text(message):
                     all_optional_sinsets = set(all_optional_sinsets)
                     new_word = lesk(sentense, word, synsets=all_optional_sinsets)
                     if new_word is not None:
-                        word = new_word._name.split('.')[0]
+                        word = get_only_word_from_syn(new_word)
                     else:
-                        # print('-----whoops-----')
-                        # print(word)
-                        # print(suggested_words[0])
                         word = suggested_words[0].lower()
-                else:
-                    # if len(suggested_words) == 0:
-                    #     # TODO if there is no suggestion- remove the word
-                    #     continue
-                    pass
             # remove stop words
             if word in nltk_stop_words or word in signs_list:
                 continue
-
             # find a sense that describe the current word
             word = find_sense(word, sentense)
-
         words.append(stemmer.stem(word)) # TODO check if and where put the stemming
-
     if len(words) == 0:
-        # print('----------\nlen is 0')
-        # print(message)
+        # if the message contain only stop words, return as is
         return message
     # join words to one string
     return " ".join(words)
@@ -114,12 +103,16 @@ def clean_text(message):
 def find_sense(word, sentense):
     new_word = lesk(sentense, word, pos='n')
     if new_word is not None:
-        # return new_word._name.split('.')[0] # TODO remove later! hyper does not work well
+        # return get_only_word_from_syn(new_word) # TODO remove later! hyper does not work well
         all_hypernyms = new_word.hypernyms()
         if all_hypernyms is not None and len(all_hypernyms) > 0:
             new_word = lesk(sentense, word, synsets=all_hypernyms, pos='n')
-            word = new_word._name.split('.')[0]  # TODO
+            word = get_only_word_from_syn(new_word)
     return word
+
+
+def get_only_word_from_syn(word):
+    return word._name.split('.')[0]
 
 
 def handle_nembers(number):
@@ -129,20 +122,22 @@ def handle_nembers(number):
         if len(number) >= 7:
             return PHONE_NUMBER
         return OTHER_NUMBER
-    return None # TODO maybe add other signs - dollar, euro, etc
+    return None
 
 
 def pre_process_data(data):
-    data['text'] = data['text'].apply(pre_process_msg)
-    data['text'] = data['text'].apply(clean_text)
+    print('translate slang, remove punctuation, handle numbers')
+    data['text'] = data['text'].apply(first_msg_translation)
+    print('translate word to english, remove stopwords, stemm')
+    data['text'] = data['text'].apply(second_msg_translation)
     return data
 
 
-def prepare_data_for_classify(data):
+def prepare_data_for_classify(data, random_state):
     # assigned label 1 if spam and 0 if ham
     data['label'] = data['category'].apply(lambda x: 0 if x =='ham' else 1)
     # Split data into training and testing sets
-    x_train, x_test, y_train, y_test = train_test_split(data['text'], data['label'], random_state = 5)
+    x_train, x_test, y_train, y_test = train_test_split(data['text'], data['label'], random_state = random_state)
     return x_train, x_test, y_train, y_test
 
 
@@ -167,9 +162,11 @@ def multinomial_naive_bayes_classifier(x_train_cv, y_train, x_test_cv):
 
 
 def print_results(y_test, predictions):
-    print('Accuracy score: ', accuracy_score(y_test, predictions))
+    accuracy = accuracy_score(y_test, predictions)
+    print('Accuracy score: ', accuracy)
     print('Precision score: ', precision_score(y_test, predictions))
     print('Recall score: ', recall_score(y_test, predictions))
+    return accuracy
 
 
 def investigate_score(y_test, predictions):
@@ -241,7 +238,7 @@ def change_msg_by_cluster(message, cluster_words, k_clusterer, model):
 
 
 def change_data_by_cluster(data_text, k_clusterer, model, assigned_clusters):
-    cluster_words = [-1]*30
+    cluster_words = [-1]*NUM_CLUSTERS
 
     words = list(model.wv.vocab)
     for i, word in enumerate(words):
@@ -256,9 +253,6 @@ def change_data_by_cluster(data_text, k_clusterer, model, assigned_clusters):
 if __name__ == "__main__":
     # General variables
     nltk_stop_words = set(nltk.corpus.stopwords.words('english'))
-    signs_str = """!"#$%&':()*+,-./:;<=>?@[\]^_`{|}~"""
-    signs_list = [',', '/', '.', '"', "'", '?', '\\', ':', '(', ')', '*', '-', '=', '+', '&', '^', '$', '%', '#', '@',
-                  '!', '`', '~', "'s"]
     stemmer = nltk.SnowballStemmer("english")
     english_dict = enchant.Dict("en_US")
     slang_dict = create_noslang_dict()
@@ -267,31 +261,47 @@ if __name__ == "__main__":
         WordNetCorpusReader,
         LazyCorpusLoader('omw', CorpusReader, r'.*/wn-data-.*\.tab', encoding='utf8'),
     )
+    signs_list = [',', '/', '.', '"', "'", '?', '\\', ':', '(', ')', '*', '-', '=', '+', '&', '^', '$', '%',
+                  '#', '@', '!', '`', '~', "'s"]
 
     # Actual code
-    print('----------read data----------')
+    print('-------------read data--------------')
     data = read_data()
     print('----------pre procsss data----------')
-    data = pre_process_data(data)
-    # load=False
-    # print('----------build word2vec model load=%s----------' % str(load))
-    # word2vec_model = wordEmbbiding(data['text'], load=load)
-    # print('----------assign clusters----------')
-    # assigned_clusters, k_clusterer = clustering_with_k_means(word2vec_model)
-    # data['text'] = change_data_by_cluster(data['text'], k_clusterer, word2vec_model, assigned_clusters)
+    data_after_pre_process = pre_process_data(data)
+    total_accuracy = 0
+    max_accuracy = 0
+    max_accuracy_index = 0
+    for random_state in range(0, 10000):
+        data = data_after_pre_process.copy()
+        print(random_state)
+        # load=False
+        # print('----------build word2vec model load=%s----------' % str(load))
+        # word2vec_model = wordEmbbiding(data['text'], load=load)
+        # print('----------assign clusters----------')
+        # assigned_clusters, k_clusterer = clustering_with_k_means(word2vec_model)
+        # data['text'] = change_data_by_cluster(data['text'], k_clusterer, word2vec_model, assigned_clusters)
 
-    x_train, x_test, y_train, y_test = prepare_data_for_classify(data)
-    x_train_cv, x_test_cv, cv = bag_of_words(x_train, x_test)
+        x_train, x_test, y_train, y_test = prepare_data_for_classify(data, random_state)
+        x_train_cv, x_test_cv, cv = bag_of_words(x_train, x_test)
 
-    # investigate data
-    investigate_data(x_train_cv, cv)
-    investigate_data(x_test_cv, cv)
+        # investigate data
+        investigate_data(x_train_cv, cv)
+        investigate_data(x_test_cv, cv)
 
-    predictions = multinomial_naive_bayes_classifier(x_train_cv, y_train, x_test_cv)
+        predictions = multinomial_naive_bayes_classifier(x_train_cv, y_train, x_test_cv)
 
-    # investigate results
-    print_results(y_test, predictions)
-    investigate_score(y_test, predictions)
-    investigate_misses(x_test, y_test, predictions)
+        # investigate results
+        print('--------------results---------------')
+        accuracy = print_results(y_test, predictions)
+        total_accuracy += accuracy
+        if accuracy > max_accuracy:
+            max_accuracy_index = random_state
+        max_accuracy = max(max_accuracy, accuracy)
+        investigate_score(y_test, predictions)
+        investigate_misses(x_test, y_test, predictions)
 
-    pass
+        pass
+    print('total accuracy: %s' % (total_accuracy))
+    print('max accuracy: %s. index:%s' % (max_accuracy, max_accuracy_index))
+    print('mean accuracy: %s' % (total_accuracy/100))
