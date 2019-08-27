@@ -15,6 +15,7 @@ from gensim.models import Word2Vec
 from nltk.cluster import KMeansClusterer
 from nltk.corpus.util import LazyCorpusLoader
 from nltk.corpus.reader import *
+from matplotlib.font_manager import FontProperties
 
 
 PHONE_NUMBER = 'phonenumber'
@@ -38,14 +39,6 @@ def create_noslang_dict():
             slang, english = line.strip().split(' :', 1)
             noslang[slang] = english
     return noslang
-
-
-def has_number(in_string):
-    return any(char.isdigit() for char in in_string)
-
-
-def is_number(in_string):
-    return all(char.isdigit() for char in in_string)
 
 
 def first_msg_translation(message):
@@ -112,7 +105,7 @@ def get_only_word_from_syn(word):
     return word._name.split('.')[0]
 
 
-def plot_our_bar_graph(nb, p_nb, wh):
+def compare_our_result(nb, p_nb, wh):
     # convert to percet=ntage
     nb = [x*100 for x in nb]
     p_nb = [x*100 for x in p_nb]
@@ -129,41 +122,45 @@ def plot_our_bar_graph(nb, p_nb, wh):
     r3 = [x + barWidth for x in r2]
 
     # Make the plot
-    plt.bar(r1, nb, color='red', width=barWidth, edgecolor='white', label='NB')
+    plt.bar(r1, nb, color='orange', width=barWidth, edgecolor='white', label='NB')
     plt.bar(r2, p_nb, color='blue', width=barWidth, edgecolor='white', label='PreProcessing + NB')
-    plt.bar(r3, wh, color='green', width=barWidth, edgecolor='white', label='PreProcessing + FeatureExtraction + NB')
+    plt.bar(r3, wh, color='gray', width=barWidth, edgecolor='white', label='PreProcessing + FeatureExtraction + NB')
 
     # Add xticks on the middle of the group bars
     plt.xlabel('Classifier', fontweight='bold')
     plt.ylabel('Score', fontweight='bold')
     plt.xticks([r + barWidth for r in range(len(nb))], ['accuracy', 'precision', 'recall'])
 
-    # limit the graph between 80 to 100
-    plt.ylim(bottom=80, top=100)
+    plt.title("Compare stages result")
 
-    # Create legend & Show graphic
-    plt.legend()
-    plt.show()
-    plt.savefig("our result.png")
+    # limit the graph
+    plt.ylim(bottom=80, top=104.9)
+
+    # Create legend & Save graphic
+    fontP = FontProperties()
+    fontP.set_size('small')
+    plt.legend(loc='upper left', prop=fontP)
+
+    plt.savefig("Compare stages result.png")
 
 
-def plot_estimated_bar_graph(wh):
+def compare_result_to_papers(wh):
     plt.clf()
     # calc only accuracy, and convert to percentage
-    names = ['our methed', 'jialin_mtm', 'jialin_svm', 'tiago_dectw', 'tiago_bnb', 'dea_nb', 'dea_nb_fp']
-    values = [wh[0]*100, 97.0, 96.0, 94.2, 91.2, 98.481, 98.506]
+    full_names = ['our method', 'dea_nb_fp', 'jilian_mtm', 'tiago_dectw']
+    names = ['Our Method', 'Paper 1', 'Paper 2', 'Paper 3']
+    values = [wh[0]*100, 98.506, 97.0, 94.2]
 
     # this is for plotting purpose
     index = np.arange(len(names))
     plt.bar(index, values)
-    plt.xlabel('Classifier', fontweight='bold')
-    plt.ylabel('Score', fontweight='bold')
-    plt.xticks(index, names, rotation=30)
-    plt.title('Estimated result')
-    # limit the graph between 90 to 100
+    plt.xlabel('Method', fontweight='bold')
+    plt.ylabel('Accuracy', fontweight='bold')
+    plt.xticks(index, names)
+    plt.title('Compare Methods')
+    # limit the graph
     plt.ylim(bottom=90, top=100)
-    plt.show()
-    plt.savefig('estimated_result.png')
+    plt.savefig('Compare Methods.png')
 
 
 def handle_nembers(number):
@@ -194,6 +191,12 @@ def prepare_data_for_classify(data, random_state):
 
 
 def bag_of_words(x_train, x_test):
+    """
+    convert data to counted vector, that count how many times each word appears
+    :param x_train: training data
+    :param x_test: test data
+    :return: the converted counted vectors and the mapping - training, test, cv
+    """
     cv = CountVectorizer()
     x_train_cv = cv.fit_transform(x_train)
     x_test_cv = cv.transform(x_test)
@@ -201,11 +204,24 @@ def bag_of_words(x_train, x_test):
 
 
 def investigate_data(x_cv, cv):
+    """
+    investigate data
+    :param x_cv: data represented as counted vector
+    :param cv: the counted vector that mapped words to vector
+    :return: None
+    """
     word_freq_df = pd.DataFrame(x_cv.toarray(), columns=cv.get_feature_names())
     top_words_df = pd.DataFrame(word_freq_df.sum()).sort_values(0, ascending=False)
 
 
 def multinomial_naive_bayes_classifier(x_train_cv, y_train, x_test_cv):
+    """
+    classify data by naive bayes classifier
+    :param x_train_cv: training data represented as counted vector
+    :param y_train: true labels of training data
+    :param x_test_cv: test data represented as counted vector
+    :return: predicted labels
+    """
     naive_bayes = MultinomialNB()
     naive_bayes.fit(x_train_cv, y_train)
     predictions = naive_bayes.predict(x_test_cv)
@@ -213,6 +229,12 @@ def multinomial_naive_bayes_classifier(x_train_cv, y_train, x_test_cv):
 
 
 def print_results(y_test, predictions):
+    """
+    print prediction results
+    :param y_test: true labels
+    :param predictions: model predictions
+    :return: accuracy, precision, recall
+    """
     accuracy = accuracy_score(y_test, predictions)
     precision = precision_score(y_test, predictions)
     recall = recall_score(y_test, predictions)
@@ -223,15 +245,30 @@ def print_results(y_test, predictions):
 
 
 def investigate_score(y_test, predictions, title):
+    """
+    investigate score
+    :param y_test: the messages from testing data
+    :param predictions: model predictions
+    :param title: name of the run we do
+    :return: None, create figure that represent the result
+    """
     plt.clf()
     cm = confusion_matrix(y_test, predictions)
     sns.heatmap(cm, square=True, annot=True, cmap='RdBu', cbar = False, xticklabels = ['ham', 'spam'], yticklabels = ['ham', 'spam'], fmt='g')
     plt.xlabel('true label')
     plt.ylabel('predicted label')
+    plt.title('investigate Method score')
     plt.savefig(title + ' investigate score.png')
 
 
 def investigate_misses(x_test, y_test, predictions):
+    """
+    investigate misses
+    :param x_test: the messages from testing data
+    :param y_test: true test labels
+    :param predictions: model predictions
+    :return: None
+    """
     testing_predictions = []
     for i in range(len(x_test)):
         if predictions[i] == 1:
@@ -304,6 +341,14 @@ def change_data_by_cluster(data_text, k_clusterer, model, assigned_clusters):
 
 
 def run_whole_stages(data, feature_extraction, title, random_state):
+    """
+    run whole stage of data prediction, include pre processing
+    :param data: the data to run on
+    :param feature_extraction: boolean that says if we want to use feature extraction
+    :param title: the name of the run we do
+    :param random_state: a state represent a random seed to split the data
+    :return: predicted result
+    """
     print('----------pre procsss data----------')
     data = pre_process_data(data, feature_extraction)
 
@@ -318,6 +363,13 @@ def run_whole_stages(data, feature_extraction, title, random_state):
 
 
 def run_prediction_stage(data, title, random_state):
+    """
+    run prediction stage
+    :param data: the data to run predict on
+    :param title: the name of the run we do
+    :param random_state: a state represent a random seed to split the data
+    :return: predicted result
+    """
     x_train, x_test, y_train, y_test = prepare_data_for_classify(data, random_state)
     x_train_cv, x_test_cv, cv = bag_of_words(x_train, x_test)
 
@@ -337,8 +389,33 @@ def run_prediction_stage(data, title, random_state):
 
 
 def run_nb_stage(x_train_cv, y_train, x_test_cv):
+    """
+    run naive bayes algorithm
+    :param x_train_cv: training data, represented as counted vector
+    :param y_train: labels of the training data
+    :param x_test_cv: test data, to predict
+    :return: preticted labels to the test data
+    """
     predictions = multinomial_naive_bayes_classifier(x_train_cv, y_train, x_test_cv)
     return predictions
+
+
+def has_number(in_string):
+    """
+    check if a string contains number
+    :param in_string: the string to check
+    :return: True if contain number, False otherwise
+    """
+    return any(char.isdigit() for char in in_string)
+
+
+def is_number(in_string):
+    """
+    check if the string is a number
+    :param in_string: the string to check
+    :return: True if number, False otherwise
+    """
+    return all(char.isdigit() for char in in_string)
 
 
 if __name__ == "__main__":
@@ -361,12 +438,9 @@ if __name__ == "__main__":
     print('-----------------run only NB------------------')
     nb = run_prediction_stage(data.copy(), title='Naive Bayes', random_state=234)
     print('------------run preprocess and NB-------------')
-    p_nb = run_whole_stages(data.copy(),
-                                                                  feature_extraction=False, title='PreProcess + Naive Bayes', random_state=123)
+    p_nb = run_whole_stages(data.copy(), feature_extraction=False, title='PreProcess + Naive Bayes', random_state=123)
     print('---run preprocess feature extraction and NB---')
-    wh = run_whole_stages(data.copy(), feature_extraction=True,
-                                                            title='PreProcess + Feature Extraction + Naive Bayes', random_state=28)
-    print('finish')
+    wh = run_whole_stages(data.copy(), feature_extraction=True, title='PreProcess + Feature Extraction + Naive Bayes', random_state=28)
 
-    plot_our_bar_graph(nb, p_nb, wh)
-    plot_estimated_bar_graph(wh)
+    compare_our_result(nb, p_nb, wh)
+    compare_result_to_papers(wh)
