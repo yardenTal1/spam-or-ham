@@ -16,7 +16,6 @@ from nltk.corpus.reader import *
 from matplotlib.font_manager import FontProperties
 import random
 
-
 PHONE_NUMBER = 'phonenumber'
 OTHER_NUMBER = 'othernumber'
 
@@ -53,13 +52,13 @@ def first_msg_translation(message):
     :return: the message after translation
     """
     # remove punctuation
-    old_msg = message
-    message = message.translate(str.maketrans(string.punctuation, ' '*len(string.punctuation)))
+    message = message.translate(str.maketrans(string.punctuation, ' ' * len(string.punctuation)))
     # translate slang, and lower words
-    words = [slang_dict[word.lower()].lower() if word.lower() in slang_dict else word.lower() for word in message.split()]
+    words = [slang_dict[word.lower()].lower() if word.lower() in slang_dict else word.lower() for word in
+             message.split()]
     # translate numbers to phonenumber and othernumber
     words = [handle_nembers(word) if has_number(word) and handle_nembers(word) is not None else word for word in words]
-    
+
     message = " ".join(words)
     return message
 
@@ -96,7 +95,7 @@ def second_msg_translation(message, feature_extraction):
             if word in nltk_stop_words or word in signs_list:
                 continue
             # find a sense that describe the current word
-        words.append(word) # TODO check if and where put the stemming
+        words.append(word)
     new_words = []
     for word in words:
         if word in [PHONE_NUMBER, OTHER_NUMBER, 'free']:
@@ -150,28 +149,28 @@ def compare_our_result(nb, p_nb, wh):
     :return: None, build graphs
     """
     # convert to percet=ntage
-    nb = [x*100 for x in nb]
-    p_nb = [x*100 for x in p_nb]
-    wh = [x*100 for x in wh]
+    nb = [x * 100 for x in nb]
+    p_nb = [x * 100 for x in p_nb]
+    wh = [x * 100 for x in wh]
 
     plt.clf()
 
     # set width of bar
-    barWidth = 0.20
+    bar_width = 0.20
 
     # Set position of bar on X axis
     r1 = np.arange(len(nb))
-    r2 = [x + barWidth for x in r1]
-    r3 = [x + barWidth for x in r2]
+    r2 = [x + bar_width for x in r1]
+    r3 = [x + bar_width for x in r2]
 
     # Make the plot
-    plt.bar(r1, nb, color='orange', width=barWidth, edgecolor='white', label='NB')
-    plt.bar(r2, p_nb, color='blue', width=barWidth, edgecolor='white', label='PreProcessing + NB')
-    plt.bar(r3, wh, color='gray', width=barWidth, edgecolor='white', label='PreProcessing + FeatureExtraction + NB')
+    plt.bar(r1, nb, color='orange', width=bar_width, edgecolor='white', label='NB')
+    plt.bar(r2, p_nb, color='blue', width=bar_width, edgecolor='white', label='PreProcessing + NB')
+    plt.bar(r3, wh, color='gray', width=bar_width, edgecolor='white', label='PreProcessing + FeatureExtraction + NB')
 
     plt.ylabel('Precision percentage', fontweight='bold')
     # Add xticks on the middle of the group bars
-    plt.xticks([r + barWidth for r in range(len(nb))], ['accuracy', 'precision', 'recall'])
+    plt.xticks([r + bar_width for r in range(len(nb))], ['accuracy', 'precision', 'recall'])
 
     plt.title("Compare stages result")
 
@@ -179,9 +178,9 @@ def compare_our_result(nb, p_nb, wh):
     plt.ylim(bottom=80, top=104.9)
 
     # Create legend & Save graphic
-    fontP = FontProperties()
-    fontP.set_size('small')
-    plt.legend(loc='upper left', prop=fontP)
+    font_p = FontProperties()
+    font_p.set_size('small')
+    plt.legend(loc='upper left', prop=font_p)
 
     plt.savefig("Compare stages result.png")
 
@@ -194,9 +193,9 @@ def compare_result_to_papers(wh):
     """
     plt.clf()
     # calc only accuracy, and convert to percentage
-    full_names = ['our method', 'dea_nb_fp', 'jilian_mtm', 'tiago_dectw']
+    # full_names = ['our method', 'dea_nb_fp', 'jilian_mtm', 'tiago_dectw']
     names = ['Our Method', 'Paper 1', 'Paper 2', 'Paper 3']
-    values = [wh[0]*100, 98.506, 97.0, 94.2]
+    values = [wh[0] * 100, 98.506, 97.0, 94.2]
 
     # this is for plotting purpose
     index = np.arange(len(names))
@@ -225,34 +224,34 @@ def handle_nembers(number):
     return None
 
 
-def pre_process_data(data, aggregate_features):
+def pre_process_data(data_df, aggregate_features):
     """
     run preprocessing stage
-    :param data: the data to preprocess
+    :param data_df: the data to preprocess
     :param aggregate_features: a boolean that say if we want to aggregate features
     :return: data after pre process
     """
     print('translate slang, remove punctuation, handle numbers')
-    data['text'] = data['text'].apply(first_msg_translation)
+    data_df['text'] = data_df['text'].apply(first_msg_translation)
     print('translate word to english, remove stopwords, stemm')
     second_msg_func = lambda x: second_msg_translation(x, aggregate_features)
-    data['text'] = data['text'].apply(second_msg_func)
-    return data
+    data_df['text'] = data_df['text'].apply(second_msg_func)
+    return data_df
 
 
-def prepare_data_for_classify(data, random_state=None):
+def prepare_data_for_classify(data_df, random_state=None):
     """
     prepare the data to classifying format
-    :param data: the data to classify
+    :param data_df: the data to classify
     :param random_state: a seed to split the data by (keep empty if you want a random seed)
     :return: x_train, x_test, y_train, y_test
     """
     if random_state is None:
         random_state = random.randint(0, 1000)
     # assigned label 1 if spam and 0 if ham
-    data['label'] = data['category'].apply(lambda x: 0 if x =='ham' else 1)
+    data_df['label'] = data_df['category'].apply(lambda x: 0 if x == 'ham' else 1)
     # Split data into training and testing sets
-    x_train, x_test, y_train, y_test = train_test_split(data['text'], data['label'], random_state = random_state)
+    x_train, x_test, y_train, y_test = train_test_split(data_df['text'], data_df['label'], random_state=random_state)
     return x_train, x_test, y_train, y_test
 
 
@@ -320,7 +319,8 @@ def investigate_score(y_test, predictions, title):
     """
     plt.clf()
     cm = confusion_matrix(y_test, predictions)
-    sns.heatmap(cm, square=True, annot=True, cmap='RdBu', cbar = False, xticklabels = ['ham', 'spam'], yticklabels = ['ham', 'spam'], fmt='g')
+    sns.heatmap(cm, square=True, annot=True, cmap='RdBu', cbar=False, xticklabels=['ham', 'spam'],
+                yticklabels=['ham', 'spam'], fmt='g')
     plt.xlabel('true label')
     plt.ylabel('predicted label')
     plt.title('investigate Method score')
@@ -341,34 +341,34 @@ def investigate_misses(x_test, y_test, predictions):
             testing_predictions.append('spam')
         else:
             testing_predictions.append('ham')
-    check_df = pd.DataFrame({'actual_label': list(y_test), 'prediction': testing_predictions, 'text':list(x_test)})
-    check_df.replace(to_replace=0, value='ham', inplace = True)
-    check_df.replace(to_replace=1, value='spam', inplace = True)
+    check_df = pd.DataFrame({'actual_label': list(y_test), 'prediction': testing_predictions, 'text': list(x_test)})
+    check_df.replace(to_replace=0, value='ham', inplace=True)
+    check_df.replace(to_replace=1, value='spam', inplace=True)
 
 
-def run_whole_stages(data, aggregate_features, title, random_state):
+def run_whole_stages(data_df, aggregate_features, title, random_state):
     """
     run whole stage of data prediction, include pre processing
-    :param data: the data to run on
+    :param data_df: the data to run on
     :param aggregate_features: boolean that says if we want to use feature extraction
     :param title: the name of the run we do
     :param random_state: a state represent a random seed to split the data
     :return: predicted result
     """
     print('----------pre procsss data----------')
-    data = pre_process_data(data, aggregate_features)
-    return run_prediction_stage(data, title, random_state)
+    data_df = pre_process_data(data_df, aggregate_features)
+    return run_prediction_stage(data_df, title, random_state)
 
 
-def run_prediction_stage(data, title, random_state):
+def run_prediction_stage(data_df, title, random_state):
     """
     run prediction stage
-    :param data: the data to run predict on
+    :param data_df: the data to run predict on
     :param title: the name of the run we do
     :param random_state: a state represent a random seed to split the data
     :return: predicted result
     """
-    x_train, x_test, y_train, y_test = prepare_data_for_classify(data, random_state)
+    x_train, x_test, y_train, y_test = prepare_data_for_classify(data_df, random_state)
     x_train_cv, x_test_cv, cv = bag_of_words(x_train, x_test)
 
     # investigate data
@@ -422,16 +422,18 @@ def compare_method_stages():
     :return: None, build graphs
     """
     print('------------------read data-------------------')
-    data = read_data()
+    data_df = read_data()
     print('-----------------run only NB------------------')
-    nb_results = run_prediction_stage(data.copy(), title='Naive Bayes', random_state=234)
+    nb_results = run_prediction_stage(data_df.copy(), title='Naive Bayes', random_state=234)
     print('------------run preprocess and NB-------------')
-    p_nb_results = run_whole_stages(data.copy(), aggregate_features=False, title='PreProcess + Naive Bayes', random_state=123)
+    p_nb_results = run_whole_stages(data_df.copy(), aggregate_features=False, title='PreProcess + Naive Bayes',
+                                    random_state=123)
     print('---run preprocess feature extraction and NB---')
-    wp_results = run_whole_stages(data.copy(), aggregate_features=True, title='PreProcess + Feature Extraction + Naive Bayes', random_state=28)
+    cur_wp_results = run_whole_stages(data_df.copy(), aggregate_features=True,
+                                      title='PreProcess + Feature Extraction + Naive Bayes', random_state=28)
 
-    compare_our_result(nb_results, p_nb_results, wp_results)
-    compare_result_to_papers(wp_results)
+    compare_our_result(nb_results, p_nb_results, cur_wp_results)
+    compare_result_to_papers(cur_wp_results)
 
 
 if __name__ == "__main__":
@@ -455,6 +457,7 @@ if __name__ == "__main__":
     print('------------------read data-------------------')
     data = read_data()
     print('---run preprocess feature extraction and NB---')
-    wp_results = run_whole_stages(data.copy(), aggregate_features=True, title='PreProcess + Feature Extraction + Naive Bayes', random_state=28)
+    wp_results = run_whole_stages(data.copy(), aggregate_features=True,
+                                  title='PreProcess + Feature Extraction + Naive Bayes', random_state=28)
     print('------compare results to papers-----')
     compare_result_to_papers(wp_results)
