@@ -1,0 +1,25 @@
+The project contains the following files:
+
+- spam_detection.py - main project file. this file contain the following parts:
+	- preprocessing 		- this section get a data, represented as dataframe, and preprocess him,
+							  to organize the information he contains better.
+	- feature extraction    - this section get the data, represent the messages after preprocessing,
+							  and aggregate similar words to one gereral words that contains them.
+	- classifying			- this section get a tagged set of the data, split it to train and test.
+							  then, the classifier learn how to classify from the training set, and 
+							  predict tags to the test set.
+	- build graphs			- this section appreciate the result of the classifying part by comparing
+							  each part of the method seperetly, and by compare the result to previous
+							  methods.
+	- running code			- this section contains code that read the data and move over the previous
+							  sections, one by one.
+
+- spam.csv			- SMS Spam Collection DataSet, V.1.
+					  the contains 5572 SMS tagged by spam (747) and ham (4825).
+					  
+- Noslang.txt       - a text file that contains slang to english dictionary,
+					  the dictionary called NoSlang, and available online at:
+
+					  
+to run this code, all you need to do is install the relevent packages and run 'spam_detection.py' 
+file (using python) by: 'python .../spam_detection.py'
