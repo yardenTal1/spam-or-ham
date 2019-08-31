@@ -19,6 +19,7 @@ The project contains the following files:
 					  
 - Noslang.txt       - a text file that contains slang to english dictionary,
 					  the dictionary called NoSlang, and available online at:
+					  http://www.noslang.com/dictionary/full/
 
 					  
 to run this code, all you need to do is install the relevent packages and run 'spam_detection.py' 
