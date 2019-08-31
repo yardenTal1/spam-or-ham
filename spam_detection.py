@@ -451,23 +451,10 @@ if __name__ == "__main__":
     signs_list = [',', '/', '.', '"', "'", '?', '\\', ':', '(', ')', '*', '-', '=', '+', '&', '^', '$', '%',
                   '#', '@', '!', '`', '~', "'s"]
 
-    # # Actual code
-    # print('------------------read data-------------------')
-    # data = read_data()
-    # print('---run preprocess feature extraction and NB---')
-    # wp_results = run_whole_stages(data.copy(), aggregate_features=True, title='PreProcess + Feature Extraction + Naive Bayes', random_state=28)
-    # print('------compare results to papers-----')
-    # compare_result_to_papers(wp_results)
-
     # Actual code
     print('------------------read data-------------------')
     data = read_data()
-    print('-----------------run only NB------------------')
-    nb = run_prediction_stage(data.copy(), title='Naive Bayes', random_state=234)
-    print('------------run preprocess and NB-------------')
-    p_nb = run_whole_stages(data.copy(), aggregate_features=False, title='PreProcess + Naive Bayes', random_state=123)
     print('---run preprocess feature extraction and NB---')
-    wh = run_whole_stages(data.copy(), aggregate_features=True, title='PreProcess + Feature Extraction + Naive Bayes', random_state=28)
-
-    compare_our_result(nb, p_nb, wh)
-    compare_result_to_papers(wh)
+    wp_results = run_whole_stages(data.copy(), aggregate_features=True, title='PreProcess + Feature Extraction + Naive Bayes', random_state=28)
+    print('------compare results to papers-----')
+    compare_result_to_papers(wp_results)
