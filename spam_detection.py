@@ -11,28 +11,33 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 import seaborn as sns
-from gensim.models import Word2Vec
-from nltk.cluster import KMeansClusterer
 from nltk.corpus.util import LazyCorpusLoader
 from nltk.corpus.reader import *
 from matplotlib.font_manager import FontProperties
+import random
 
 
 PHONE_NUMBER = 'phonenumber'
 OTHER_NUMBER = 'othernumber'
-NUM_CLUSTERS = 150
 
 
 def read_data():
+    """
+    read the sms collection dataset, and convert to dataframe
+    :return: sms collection dataset, represented as dataframe
+    """
     messages = pd.read_csv("./spam.csv", encoding='latin-1')
     # Drop the extra columns and rename columns
     messages = messages.drop(labels=["Unnamed: 2", "Unnamed: 3", "Unnamed: 4"], axis=1)
     messages.columns = ["category", "text"]
-    # messages = messages.iloc[0:100] # TODO remove after testing
     return messages
 
 
 def create_noslang_dict():
+    """
+    create an slang to english dictionary, based on noSlang dictionary
+    :return: the noSlang dictionary
+    """
     noslang = {}
     with open('./Noslang.txt') as noslangfile:
         for line in noslangfile:
@@ -42,6 +47,11 @@ def create_noslang_dict():
 
 
 def first_msg_translation(message):
+    """
+    run the first process of the given message
+    :param message: the message to translate
+    :return: the message after translation
+    """
     # remove punctuation
     old_msg = message
     message = message.translate(str.maketrans(string.punctuation, ' '*len(string.punctuation)))
@@ -55,6 +65,12 @@ def first_msg_translation(message):
 
 
 def second_msg_translation(message, feature_extraction):
+    """
+    run a second process of the given message
+    :param message: the message to translate
+    :param feature_extraction: do we want to aggregate features
+    :return: the message after translation
+    """
     # remove punctuation
     words = []
     sentense = message.split()
@@ -97,6 +113,13 @@ def second_msg_translation(message, feature_extraction):
 
 
 def find_sense(word, sentense, feature_extraction):
+    """
+    find appropriate sense of a word
+    :param word: a word to find her sense
+    :param sentense: the context of the word
+    :param feature_extraction: do we want to aggregate feature by sense of not
+    :return: the appropriate sense of the word
+    """
     new_word = lesk(sentense, word, pos='n')
     if new_word is not None:
         if feature_extraction:
@@ -109,11 +132,23 @@ def find_sense(word, sentense, feature_extraction):
     return word
 
 
-def get_only_word_from_syn(word):
-    return word._name.split('.')[0]
+def get_only_word_from_syn(syn):
+    """
+    get the word from a given syn
+    :param syn: text represent a syn
+    :return: the word part of the syn
+    """
+    return syn._name.split('.')[0]
 
 
 def compare_our_result(nb, p_nb, wh):
+    """
+    compare results of method stages
+    :param nb: naive bayes stage results
+    :param p_nb: pre processing and naive bayes results
+    :param wh: whole process results
+    :return: None, build graphs
+    """
     # convert to percet=ntage
     nb = [x*100 for x in nb]
     p_nb = [x*100 for x in p_nb]
@@ -153,6 +188,11 @@ def compare_our_result(nb, p_nb, wh):
 
 
 def compare_result_to_papers(wh):
+    """
+    compare results of wh to the three papers
+    :param wh: data results to compare with
+    :return: None, build graphs
+    """
     plt.clf()
     # calc only accuracy, and convert to percentage
     full_names = ['our method', 'dea_nb_fp', 'jilian_mtm', 'tiago_dectw']
@@ -172,6 +212,11 @@ def compare_result_to_papers(wh):
 
 
 def handle_nembers(number):
+    """
+    convert number to phone number or other nomber
+    :param number: the number to handle
+    :return: phone_number, other_number or None if the text does not represent a number
+    """
     number = number.translate(str.maketrans('', '', ','))
     number = number.translate(str.maketrans('', '', '-'))
     if is_number(number):
@@ -181,16 +226,30 @@ def handle_nembers(number):
     return None
 
 
-def pre_process_data(data, feature_extraction):
+def pre_process_data(data, aggregate_features):
+    """
+    run preprocessing stage
+    :param data: the data to preprocess
+    :param aggregate_features: a boolean that say if we want to aggregate features
+    :return: data after pre process
+    """
     print('translate slang, remove punctuation, handle numbers')
     data['text'] = data['text'].apply(first_msg_translation)
     print('translate word to english, remove stopwords, stemm')
-    second_msg_func = lambda x: second_msg_translation(x, feature_extraction)
+    second_msg_func = lambda x: second_msg_translation(x, aggregate_features)
     data['text'] = data['text'].apply(second_msg_func)
     return data
 
 
-def prepare_data_for_classify(data, random_state):
+def prepare_data_for_classify(data, random_state=None):
+    """
+    prepare the data to classifying format
+    :param data: the data to classify
+    :param random_state: a seed to split the data by (keep empty if you want a random seed)
+    :return: x_train, x_test, y_train, y_test
+    """
+    if random_state is None:
+        random_state = random.randint(0, 1000)
     # assigned label 1 if spam and 0 if ham
     data['label'] = data['category'].apply(lambda x: 0 if x =='ham' else 1)
     # Split data into training and testing sets
@@ -288,85 +347,17 @@ def investigate_misses(x_test, y_test, predictions):
     check_df.replace(to_replace=1, value='spam', inplace = True)
 
 
-def wordEmbbiding(data_text, load=False):
-    if load:
-        model = Word2Vec.load("word2vec.model")
-    else:
-        data_text = list(data_text)
-        data = []
-
-        # tokenize the into words
-        for sent in data_text:
-            for word in nltk.word_tokenize(sent):
-                data.append([word])
-
-        # Create CBOW model
-        model = Word2Vec(data, min_count=1,size=100, window=5)
-        model.save("word2vec.model")
-    return model
-
-
-def clustering_with_k_means(model):
-    X = model[model.wv.vocab]
-    k_clusterer = KMeansClusterer(NUM_CLUSTERS, distance=nltk.cluster.util.cosine_distance, repeats=25)
-    assigned_clusters = k_clusterer.cluster(X, assign_clusters=True)
-    return assigned_clusters, k_clusterer
-
-
-def print_clustering(model, assigned_clusters, k_clusterer):
-    words = list(model.wv.vocab)
-    for i, word in enumerate(words):
-        print(word + ":" + str(assigned_clusters[i]))
-
-
-def print_means(k_clusterer):
-    print('Means:', k_clusterer.means())
-
-
-def change_msg_by_cluster(message, cluster_words, k_clusterer, model):
-    # translate slang, and lower words
-    words = message.split()
-    new_words = []
-    for word in words:
-        word_class = k_clusterer.classify(model.wv[word])
-        new_words.append(cluster_words[word_class])
-
-    message = " ".join(new_words)
-    return message
-
-
-def change_data_by_cluster(data_text, k_clusterer, model, assigned_clusters):
-    cluster_words = [-1]*NUM_CLUSTERS
-
-    words = list(model.wv.vocab)
-    for i, word in enumerate(words):
-        cur_class = assigned_clusters[i]
-        if cluster_words[cur_class] == -1:
-            cluster_words[cur_class] = word
-
-    apply_func = lambda x: change_msg_by_cluster(x, cluster_words, k_clusterer, model)
-    return data_text.apply(apply_func)
-
-
-def run_whole_stages(data, feature_extraction, title, random_state):
+def run_whole_stages(data, aggregate_features, title, random_state):
     """
     run whole stage of data prediction, include pre processing
     :param data: the data to run on
-    :param feature_extraction: boolean that says if we want to use feature extraction
+    :param aggregate_features: boolean that says if we want to use feature extraction
     :param title: the name of the run we do
     :param random_state: a state represent a random seed to split the data
     :return: predicted result
     """
     print('----------pre procsss data----------')
-    data = pre_process_data(data, feature_extraction)
-
-    # load=False
-    # print('----------build word2vec model load=%s----------' % str(load))
-    # word2vec_model = wordEmbbiding(data['text'], load=load)
-    # print('----------assign clusters----------')
-    # assigned_clusters, k_clusterer = clustering_with_k_means(word2vec_model)
-    # data['text'] = change_data_by_cluster(data['text'], k_clusterer, word2vec_model, assigned_clusters)
-
+    data = pre_process_data(data, aggregate_features)
     return run_prediction_stage(data, title, random_state)
 
 
@@ -426,7 +417,28 @@ def is_number(in_string):
     return all(char.isdigit() for char in in_string)
 
 
+def compare_method_stages():
+    """
+    compare method stages
+    :return: None, build graphs
+    """
+    print('------------------read data-------------------')
+    data = read_data()
+    print('-----------------run only NB------------------')
+    nb_results = run_prediction_stage(data.copy(), title='Naive Bayes', random_state=234)
+    print('------------run preprocess and NB-------------')
+    p_nb_results = run_whole_stages(data.copy(), aggregate_features=False, title='PreProcess + Naive Bayes', random_state=123)
+    print('---run preprocess feature extraction and NB---')
+    wp_results = run_whole_stages(data.copy(), aggregate_features=True, title='PreProcess + Feature Extraction + Naive Bayes', random_state=28)
+
+    compare_our_result(nb_results, p_nb_results, wp_results)
+    compare_result_to_papers(wp_results)
+
+
 if __name__ == "__main__":
+    """
+    run the whole process
+    """
     # General variables
     nltk_stop_words = set(nltk.corpus.stopwords.words('english'))
     stemmer = nltk.SnowballStemmer("english")
@@ -440,21 +452,10 @@ if __name__ == "__main__":
     signs_list = [',', '/', '.', '"', "'", '?', '\\', ':', '(', ')', '*', '-', '=', '+', '&', '^', '$', '%',
                   '#', '@', '!', '`', '~', "'s"]
 
-    msg = 'Had your mobile 11 months or more? U R entitled to Update to the latest colour mobiles with camera for Free! Call The Mobile Update Co FREE on 08002986030'
-    print(msg)
-    msg = first_msg_translation(msg)
-    print(msg)
-    msg = second_msg_translation(msg, True)
-    print(msg)
     # Actual code
     print('------------------read data-------------------')
     data = read_data()
-    print('-----------------run only NB------------------')
-    nb = run_prediction_stage(data.copy(), title='Naive Bayes', random_state=234)
-    print('------------run preprocess and NB-------------')
-    p_nb = run_whole_stages(data.copy(), feature_extraction=False, title='PreProcess + Naive Bayes', random_state=123)
     print('---run preprocess feature extraction and NB---')
-    wh = run_whole_stages(data.copy(), feature_extraction=True, title='PreProcess + Feature Extraction + Naive Bayes', random_state=28)
-
-    compare_our_result(nb, p_nb, wh)
-    compare_result_to_papers(wh)
+    wp_results = run_whole_stages(data.copy(), aggregate_features=True, title='PreProcess + Feature Extraction + Naive Bayes', random_state=28)
+    print('------compare results to papers-----')
+    compare_result_to_papers(wp_results)
